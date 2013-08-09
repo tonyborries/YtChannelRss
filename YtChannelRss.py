@@ -61,19 +61,27 @@ def YtChannelToRss(apikey, channel):
   channelIdString = channelIds[0]['id']
   if (VERBOSE_MODE): sys.stderr.write("Channel ID: " + channelIdString + "\n")
 
+  ###
   # Get List of Videos
-  searchRequest = youtube.search().list(
+  ytSearch = youtube.search()
+
+  searchRequest = ytSearch.list(
     channelId=channelIdString,
     part="id,snippet",
-    maxResults=20
+    maxResults=50
   )
-  searchResponse = searchRequest.execute()
 
+  reportedNumVideos = 0
   videos = []
   channels = []
   playlists = []
 
-  while (searchResponse):
+  while (searchRequest):
+    searchResponse = searchRequest.execute()
+
+    if reportedNumVideos == 0:
+      reportedNumVideos = searchResponse['pageInfo']['totalResults']
+
     for searchResult in searchResponse.get("items", []):
       if searchResult["id"]["kind"] == "youtube#video":
         video = {}
@@ -90,15 +98,17 @@ def YtChannelToRss(apikey, channel):
       elif searchResult["id"]["kind"] == "youtube#playlist":
         playlists.append("%s (%s)" % (searchResult["snippet"]["title"],
                                       searchResult["id"]["playlistId"]))
+      else:
+        sys.stderr.write("Unknown media type: " + searchResult["id"]["kind"] + "\n")
+
     # get next page of results
     searchRequest = youtube.search().list_next(previous_request=searchRequest , previous_response=searchResponse)
-    if searchRequest:
-      searchResponse = searchRequest.execute()
-    else:
-      searchResponse = None
 
   # Sort Videos
   videos = sorted(videos, key=lambda video:video['published'], reverse=True)
+
+  if len(videos) != reportedNumVideos:
+    sys.stderr.write("WARNING: Search Result Reported " + str(reportedNumVideos) + " but only retrieved " + str(len(videos)) + "\n")
 
   if (VERBOSE_MODE): sys.stderr.write("Found " + str(len(videos)) + " Videos\n")
   if (VERBOSE_MODE): sys.stderr.write("Found " + str(len(channels)) + " Channels\n")
