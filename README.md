@@ -3,7 +3,7 @@ YtChannelRss
 
 YtChannelRss downloads a list of videos from a YouTube channel, and creates an RSS feed containing all videos in that feed. This XML file will contain all videos in the channel, in contrast to many feeds that provide only the most recent items. 
 
-    Usage: YtChannelRss.py [ -h ] [ -v ] -k APIKey -c ChannelName
+    Usage: YtChannelRss.py [ -h ] [ -v ] [ --v2 ] -k APIKey -c ChannelName
     -h, --help      Show this usage message and exit.
     -v, --verbose   Verbose Output to StdErr
     -k, --apikey    YouTube API Key

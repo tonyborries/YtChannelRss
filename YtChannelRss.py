@@ -20,7 +20,7 @@ import PyRSS2Gen
 
 def usage():
   sys.stderr.write(
-"""  Usage: %s [ -h ] [ -v ] -k APIKey -c ChannelName
+"""  Usage: %s [ -h ] [ -v ] [ --v2 ] -k APIKey -c ChannelName
 
     -h, --help      Show this usage message and exit.
     -v, --verbose   Verbose Output to StdErr
