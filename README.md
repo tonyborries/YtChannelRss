@@ -22,8 +22,8 @@ Note that this completely rebuilds the RSS Feed on every run, downloading the en
 This script requires: 
 
 * Google APIs Client Library for Python and a Google API Key
-** For using v3 - (https://developers.google.com/api-client-library/python/start/installation)
-** For using v2 - (http://code.google.com/p/gdata-python-client/downloads/list)
+	* For using v3 API - (https://developers.google.com/api-client-library/python/start/installation)
+	* For using v2 API - (http://code.google.com/p/gdata-python-client/downloads/list)
 * PyRSS2Gen (https://pypi.python.org/pypi/PyRSS2Gen/1.1)
 
 ### Notes and Known Issues
