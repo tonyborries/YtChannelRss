@@ -36,7 +36,10 @@ def usage():
 # [{'id', 'title', 'url', 'published', 'description'}]
 # @return The de-duplicated video list, in the same format.
 
-def DeDuplicateVideos(videos):
+def DeDuplicateVideos(videos, verbose=False):
+
+  if (verbose): sys.stderr.write("Begin Dedup:  " + str(len(videos)) + " Videos\n")
+
   # sort by URL
   videos = sorted(videos, key=lambda video:video['url'], reverse=True)
 
@@ -47,6 +50,8 @@ def DeDuplicateVideos(videos):
       videos.pop(x)
     else:
       x+=1
+
+  if (verbose): sys.stderr.write("End Dedup:  " + str(len(videos)) + " Videos\n")
 
   return videos
 
@@ -73,55 +78,86 @@ def GetVideosV3(apikey, channelName, verbose):
 
   # Get the Channel ID String from the Channel Name
   channelResponse = youtube.channels().list(
-    part="id,snippet",
+    part="id,snippet,contentDetails",
     forUsername=channelName,
   ).execute()
   
-  channelIds = channelResponse.get("items", [])
-  if len(channelIds) != 1:
-    sys.stderr.write("Didn't find exactly one channel ID: found " + str(len(channelIds)) + " channel Ids\n")
+  channels = channelResponse.get("items", [])
+  if len(channels) != 1:
+    sys.stderr.write("Didn't find exactly one channel ID: found " + str(len(channels)) + " channel Ids\n")
     sys.exit(1)
+  channel = channels[0]
 
-  channelIdString = channelIds[0]['id']
+  channelIdString = channel['id']
   if (verbose): sys.stderr.write("Channel ID: " + channelIdString + "\n")
 
-  ###
-  # Get List of Videos
-  ytSearch = youtube.search()
+  uploads_list_id = channel["contentDetails"]["relatedPlaylists"]["uploads"]
 
-  searchRequest = ytSearch.list(
-    channelId=channelIdString,
+  playlist_request = youtube.playlistItems().list(
+    playlistId=uploads_list_id,
     part="id,snippet",
     maxResults=50,
-    type='video'
   )
 
   reportedNumVideos = 0
   videos = []
 
-  while (searchRequest):
-    searchResponse = searchRequest.execute()
+  while (playlist_request):
+    playlist_response = playlist_request.execute()
 
     if reportedNumVideos == 0:
-      reportedNumVideos = searchResponse['pageInfo']['totalResults']
+      reportedNumVideos = playlist_response['pageInfo']['totalResults']
 
-    for searchResult in searchResponse.get("items", []):
-      if searchResult["id"]["kind"] == "youtube#video":
-        video = {}
-        video['id'] = searchResult['id']['videoId']
-        video['title'] = searchResult['snippet']['title']
-        video['url'] = "http://www.youtube.com/watch?v=" + video['id']
-        dateString = searchResult['snippet']['publishedAt'][0:19] # 2013-05-18T01:43:21.000Z -> 2013-05-18T01:43:21
-        video['published'] = datetime.datetime.strptime(dateString, "%Y-%m-%dT%H:%M:%S")
-        video['description'] = searchResult['snippet']['description']
-        videos.append(video)
-      else:
-        sys.stderr.write("Unknown media type: " + searchResult["id"]["kind"] + "\n")
+    for playlist_result in playlist_response.get("items", []):
+      video = {}
+      video['id'] = playlist_result['id']
+      video['title'] = playlist_result['snippet']['title']
+      video['url'] = "http://www.youtube.com/watch?v=" + video['id']
+      dateString = playlist_result['snippet']['publishedAt'][0:19] # 2013-05-18T01:43:21.000Z -> 2013-05-18T01:43:21
+      video['published'] = datetime.datetime.strptime(dateString, "%Y-%m-%dT%H:%M:%S")
+      video['description'] = playlist_result['snippet']['description']
+      videos.append(video)
 
     # get next page of results
-    searchRequest = youtube.search().list_next(previous_request=searchRequest , previous_response=searchResponse)
+    playlist_request = youtube.playlistItems().list_next(previous_request=playlist_request , previous_response=playlist_response)
 
-  videos = DeDuplicateVideos(videos)
+  ###
+  # Get List of Videos based on Search
+#  ytSearch = youtube.search()
+#
+#  searchRequest = ytSearch.list(
+#    channelId=channelIdString,
+#    part="id,snippet",
+#    maxResults=50,
+#    type='video'
+#  )
+#
+#  reportedNumVideos = 0
+#  videos = []
+#
+#  while (searchRequest):
+#    searchResponse = searchRequest.execute()
+#
+#    if reportedNumVideos == 0:
+#      reportedNumVideos = searchResponse['pageInfo']['totalResults']
+#
+#    for searchResult in searchResponse.get("items", []):
+#      if searchResult["id"]["kind"] == "youtube#video":
+#        video = {}
+#        video['id'] = searchResult['id']['videoId']
+#        video['title'] = searchResult['snippet']['title']
+#        video['url'] = "http://www.youtube.com/watch?v=" + video['id']
+#        dateString = searchResult['snippet']['publishedAt'][0:19] # 2013-05-18T01:43:21.000Z -> 2013-05-18T01:43:21
+#        video['published'] = datetime.datetime.strptime(dateString, "%Y-%m-%dT%H:%M:%S")
+#        video['description'] = searchResult['snippet']['description']
+#        videos.append(video)
+#      else:
+#        sys.stderr.write("Unknown media type: " + searchResult["id"]["kind"] + "\n")
+#
+#    # get next page of results
+#    searchRequest = youtube.search().list_next(previous_request=searchRequest , previous_response=searchResponse)
+
+  videos = DeDuplicateVideos(videos, verbose)
 
   if len(videos) != reportedNumVideos:
     sys.stderr.write("WARNING: Search Result Reported " + str(reportedNumVideos) + " but only retrieved " + str(len(videos)) + "\n")
