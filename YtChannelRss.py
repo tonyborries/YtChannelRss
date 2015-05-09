@@ -26,7 +26,6 @@ def usage():
     -v, --verbose   Verbose Output to StdErr
     -k, --apikey    YouTube API Key
     -c, --channel   YouTube Channel / Username
-    --v2            Use the YouTube v2 API (default is V3)
 """ % sys.argv[0])
 
 ## De-duplicate the video list. 
@@ -48,54 +47,6 @@ def DeDuplicateVideos(videos):
       videos.pop(x)
     else:
       x+=1
-
-  return videos
-
-## Get the video list from a YouTube Channel, using the v2 API.
-#
-# @param apikey YouTube Developer API Key
-# @param channel YouTube Channel Name to convert to RSS.
-# @param verbose Enable Verbose Printing to STDERR.
-# @return None on error / no videos found. Otherwise, return a list of dictionary objects as 
-# [{'id', 'title', 'url', 'published', 'description'}]
-
-def GetVideosV2(apikey, channelName, verbose):
-  if (verbose): sys.stderr.write("Running v2 API\n")
-  if (verbose): sys.stderr.write("ApiKey:  " + apikey + "\n")
-  if (verbose): sys.stderr.write("Channel: " + channelName + "\n")
-
-  from gdata.youtube import service as myService
-  ytService = myService.YouTubeService(developer_key=apikey)
-  searchResults = ytService.GetYouTubeUserFeed(username=channelName)
-
-  videos = []
-  reportedNumVideos = 0
-
-  while (searchResults):
-    if reportedNumVideos == 0:
-      reportedNumVideos = int(searchResults.total_results.text)
-  
-    for entry in searchResults.entry:
-  
-      video = {}
-  
-      # parse Id string to get Video Id
-      # id is in the format 'Id:http://gdata.youtube.com/feeds/api/videos/A3e48TnUFBE'
-      video['id'] = entry.id.text.split('/')[-1]
-
-      video['title'] = entry.title.text
-      video['url'] = "http://www.youtube.com/watch?v=" + video['id']
-      dateString = entry.published.text[0:19] # 2013-05-18T01:43:21.000Z -> 2013-05-18T01:43:21
-      video['published'] = datetime.datetime.strptime(dateString, "%Y-%m-%dT%H:%M:%S")
-      video['description'] = entry.media.description.text
-      videos.append(video)
-  
-    searchResults = ytService.GetNext(searchResults)
-
-  videos = DeDuplicateVideos(videos)
-
-  if len(videos) != reportedNumVideos:
-    sys.stderr.write("WARNING: Search Result Reported " + str(reportedNumVideos) + " but only retrieved " + str(len(videos)) + "\n")
 
   return videos
 
@@ -219,7 +170,6 @@ def main(argv):
   apikey = ""
   channelName = ""
   VERBOSE_MODE = 0
-  USE_V2 = 0
 
   # Get Opts
   try:
@@ -239,8 +189,6 @@ def main(argv):
       apikey = arg
     elif opt in ("-c", "--channel"):
       channelName = arg
-    elif opt in ("--v2"):
-      USE_V2 = 1
 
   # Required Arguments
   if (channelName == "" or apikey == ""):
@@ -248,10 +196,7 @@ def main(argv):
     sys.exit(1)
 
   # get Video list
-  if USE_V2 > 0:
-    videos = GetVideosV2(apikey, channelName, VERBOSE_MODE)
-  else:
-    videos = GetVideosV3(apikey, channelName, VERBOSE_MODE)
+  videos = GetVideosV3(apikey, channelName, VERBOSE_MODE)
 
   if not videos:
     return 1
