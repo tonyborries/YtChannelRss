@@ -69,7 +69,6 @@ def GetVideosV3(apikey, channelName, verbose):
   from apiclient.discovery import build
   from googleapiclient.errors import HttpError
 
-  if (verbose): sys.stderr.write("ApiKey:  " + apikey + "\n")
   if (verbose): sys.stderr.write("Channel: " + channelName + "\n")
 
   YOUTUBE_API_SERVICE_NAME = "youtube"
