@@ -15,6 +15,7 @@ __email__ = "hiretonyb@gmail.com"
 import sys
 import getopt
 import datetime
+import time
 
 import PyRSS2Gen
 
@@ -66,6 +67,7 @@ def DeDuplicateVideos(videos, verbose=False):
 
 def GetVideosV3(apikey, channelName, verbose):
   from apiclient.discovery import build
+  from googleapiclient.errors import HttpError
 
   if (verbose): sys.stderr.write("ApiKey:  " + apikey + "\n")
   if (verbose): sys.stderr.write("Channel: " + channelName + "\n")
@@ -95,22 +97,36 @@ def GetVideosV3(apikey, channelName, verbose):
 
   playlist_request = youtube.playlistItems().list(
     playlistId=uploads_list_id,
-    part="id,snippet",
+    part="id,snippet,contentDetails",
     maxResults=50,
   )
 
   reportedNumVideos = 0
   videos = []
 
+
   while (playlist_request):
-    playlist_response = playlist_request.execute()
+    retries = 5
+    while (retries):
+      try:
+        playlist_response = playlist_request.execute()
+        retries = 0
+      except HttpError, err:
+        retries = retries - 1
+        if retries <= 0:
+          raise
+        if err.resp.status in [500, 503]:
+          if (verbose): sys.stderr.write("Received API Error - Sleeping for retry\n\t" + repr(err) + "\n")
+          time.sleep(10)
+        else:
+          raise
 
     if reportedNumVideos == 0:
       reportedNumVideos = playlist_response['pageInfo']['totalResults']
 
     for playlist_result in playlist_response.get("items", []):
       video = {}
-      video['id'] = playlist_result['id']
+      video['id'] = playlist_result['contentDetails']['videoId']
       video['title'] = playlist_result['snippet']['title']
       video['url'] = "http://www.youtube.com/watch?v=" + video['id']
       dateString = playlist_result['snippet']['publishedAt'][0:19] # 2013-05-18T01:43:21.000Z -> 2013-05-18T01:43:21
