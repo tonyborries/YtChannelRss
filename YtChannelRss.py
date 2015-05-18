@@ -21,7 +21,7 @@ import PyRSS2Gen
 
 def usage():
   sys.stderr.write(
-"""  Usage: %s [ -h ] [ -v ] [ --v2 ] -k APIKey -c ChannelName
+"""  Usage: %s [ -h ] [ -v ] -k APIKey -c ChannelName
 
     -h, --help      Show this usage message and exit.
     -v, --verbose   Verbose Output to StdErr
@@ -224,7 +224,7 @@ def main(argv):
 
   # Get Opts
   try:
-    opts, args = getopt.getopt(argv, "hvk:c:", ["help", "verbose", "apikey=", "channel=", "v2"]) 
+    opts, args = getopt.getopt(argv, "hvk:c:", ["help", "verbose", "apikey=", "channel="]) 
   except getopt.GetoptError:
     usage()
     sys.exit(2)
