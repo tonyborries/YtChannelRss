@@ -23,11 +23,12 @@ def usage():
   sys.stderr.write(
 """  Usage: %s [ -h ] [ -v ] -k <APIKey> -c <ChannelName> -r <num_most_recent>
 
-    -h, --help      Show this usage message and exit.
-    -v, --verbose   Verbose Output to StdErr
-    -k, --apikey    YouTube API Key
-    -c, --channel   YouTube Channel / Username
-    -r, --recent    Retrieve only the num_most_recent uploads (Experimental)
+    -h, --help        Show this usage message and exit.
+    -v, --verbose     Verbose Output to StdErr
+    -k, --apikey      YouTube API Key
+    -c, --channel     YouTube Channel Name / Username
+    -i, --channel_id  YouTube Channel ID
+    -r, --recent      Retrieve only the num_most_recent uploads (Experimental)
 """ % sys.argv[0])
 
 ## De-duplicate the video list. 
@@ -58,20 +59,18 @@ def DeDuplicateVideos(videos, verbose=False):
   return videos
 
 
-## Get the video list from a YouTube Channel, using the v3 API.
+## Get the Channel ID from Channel Name
 #
 # @param apikey YouTube Developer API Key
-# @param channel YouTube Channel Name to convert to RSS.
+# @param channel_name YouTube Channel Name
 # @param verbose Enable Verbose Printing to STDERR.
-# @param num_most_recent Retrieve only the num_most_recent uploads for the Channel (<= 0 disables)
-# @return None on error / no videos found. Otherwise, return a list of dictionary objects as 
-# [{'id', 'title', 'url', 'published', 'description'}]
+# @return YouTube Channel ID as String
 
-def GetVideosV3(apikey, channelName, verbose, num_most_recent):
+def GetChannelIdFromName(apikey, channel_name, verbose):
   from apiclient.discovery import build
   from googleapiclient.errors import HttpError
 
-  if (verbose): sys.stderr.write("Channel: " + channelName + "\n")
+  if (verbose): sys.stderr.write("Retrieving ID for Channel: " + channel_name + "\n")
 
   YOUTUBE_API_SERVICE_NAME = "youtube"
   YOUTUBE_API_VERSION = "v3"
@@ -82,7 +81,7 @@ def GetVideosV3(apikey, channelName, verbose, num_most_recent):
   # Get the Channel ID String from the Channel Name
   channelResponse = youtube.channels().list(
     part="id,snippet,contentDetails",
-    forUsername=channelName,
+    forUsername=channel_name,
   ).execute()
   
   channels = channelResponse.get("items", [])
@@ -92,7 +91,50 @@ def GetVideosV3(apikey, channelName, verbose, num_most_recent):
   channel = channels[0]
 
   channelIdString = channel['id']
-  if (verbose): sys.stderr.write("Channel ID: " + channelIdString + "\n")
+  if (verbose): sys.stderr.write("Found Channel ID: " + channelIdString + "\n")
+
+  return channelIdString
+
+
+## Get the video list from a YouTube Channel, using the v3 API.
+#
+# @param apikey YouTube Developer API Key
+# @param channel_id YouTube Channel ID to convert to RSS.
+# @param verbose Enable Verbose Printing to STDERR.
+# @param num_most_recent Retrieve only the num_most_recent uploads for the Channel (<= 0 disables)
+# @return None on error / no videos found. Otherwise, return a list of dictionary objects as 
+# [{'id', 'title', 'url', 'published', 'description'}]
+
+def GetVideosV3(apikey, channel_id, verbose, num_most_recent):
+  from apiclient.discovery import build
+  from googleapiclient.errors import HttpError
+
+  if (verbose): sys.stderr.write("Channel ID: " + channel_id + "\n")
+
+  YOUTUBE_API_SERVICE_NAME = "youtube"
+  YOUTUBE_API_VERSION = "v3"
+
+  # Build the Google API Client
+  youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=apikey)
+
+  if (verbose): sys.stderr.write("Retrieving Channel ID: " + channel_id + "\n")
+
+  ###
+  # Get the Channel Object
+
+  channelResponse = youtube.channels().list(
+    part="id,snippet,contentDetails",
+    id=channel_id,
+  ).execute()
+  
+  channels = channelResponse.get("items", [])
+  if len(channels) != 1:
+    sys.stderr.write("Didn't find exactly one channel ID: found " + str(len(channels)) + " channel Ids\n")
+    sys.exit(1)
+  channel = channels[0]
+
+  ### 
+  # Get the Channel Upload List
 
   uploads_list_id = channel["contentDetails"]["relatedPlaylists"]["uploads"]
 
@@ -228,12 +270,13 @@ def main(argv):
 
   apikey = ""
   channelName = ""
+  channelId = ""
   VERBOSE_MODE = 0
   num_most_recent = 0
 
   # Get Opts
   try:
-    opts, args = getopt.getopt(argv, "hvk:c:r:", ["help", "verbose", "apikey=", "channel=", "recent="]) 
+    opts, args = getopt.getopt(argv, "hvk:c:i:r:", ["help", "verbose", "apikey=", "channel=", "channel_id=", "recent="]) 
   except getopt.GetoptError:
     usage()
     sys.exit(2)
@@ -249,16 +292,27 @@ def main(argv):
       apikey = arg
     elif opt in ("-c", "--channel"):
       channelName = arg
+    elif opt in ("-i", "--channel_id"):
+      channelId = arg
     elif opt in ("-r", "--recent"):
       num_most_recent = int(arg)
 
   # Required Arguments
-  if (channelName == "" or apikey == ""):
+  if (apikey == ""):
+    sys.stderr.write("Missing API Key\n")
     usage()
     sys.exit(1)
 
+  if (channelId == ""):
+    if (channelName == ""):
+      sys.stderr.write("Missing Channel Id/Name\n")
+      usage()
+      sys.exit(1)
+    else:
+      channelId = GetChannelIdFromName(apikey, channelName, VERBOSE_MODE)
+
   # get Video list
-  videos = GetVideosV3(apikey, channelName, VERBOSE_MODE, num_most_recent)
+  videos = GetVideosV3(apikey, channelId, VERBOSE_MODE, num_most_recent)
 
   if not videos:
     return 1
