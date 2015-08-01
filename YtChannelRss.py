@@ -21,12 +21,13 @@ import PyRSS2Gen
 
 def usage():
   sys.stderr.write(
-"""  Usage: %s [ -h ] [ -v ] -k APIKey -c ChannelName
+"""  Usage: %s [ -h ] [ -v ] -k <APIKey> -c <ChannelName> -r <num_most_recent>
 
     -h, --help      Show this usage message and exit.
     -v, --verbose   Verbose Output to StdErr
     -k, --apikey    YouTube API Key
     -c, --channel   YouTube Channel / Username
+    -r, --recent    Retrieve only the num_most_recent uploads (Experimental)
 """ % sys.argv[0])
 
 ## De-duplicate the video list. 
@@ -62,10 +63,11 @@ def DeDuplicateVideos(videos, verbose=False):
 # @param apikey YouTube Developer API Key
 # @param channel YouTube Channel Name to convert to RSS.
 # @param verbose Enable Verbose Printing to STDERR.
+# @param num_most_recent Retrieve only the num_most_recent uploads for the Channel (<= 0 disables)
 # @return None on error / no videos found. Otherwise, return a list of dictionary objects as 
 # [{'id', 'title', 'url', 'published', 'description'}]
 
-def GetVideosV3(apikey, channelName, verbose):
+def GetVideosV3(apikey, channelName, verbose, num_most_recent):
   from apiclient.discovery import build
   from googleapiclient.errors import HttpError
 
@@ -135,6 +137,12 @@ def GetVideosV3(apikey, channelName, verbose):
 
     # get next page of results
     playlist_request = youtube.playlistItems().list_next(previous_request=playlist_request , previous_response=playlist_response)
+
+    # if limit the number of most recent... 
+    if (num_most_recent > 0):
+      if (len(videos) > num_most_recent):
+        playlist_request = None
+
 
   ###
   # Get List of Videos based on Search
@@ -221,10 +229,11 @@ def main(argv):
   apikey = ""
   channelName = ""
   VERBOSE_MODE = 0
+  num_most_recent = 0
 
   # Get Opts
   try:
-    opts, args = getopt.getopt(argv, "hvk:c:", ["help", "verbose", "apikey=", "channel="]) 
+    opts, args = getopt.getopt(argv, "hvk:c:r:", ["help", "verbose", "apikey=", "channel=", "recent="]) 
   except getopt.GetoptError:
     usage()
     sys.exit(2)
@@ -240,6 +249,8 @@ def main(argv):
       apikey = arg
     elif opt in ("-c", "--channel"):
       channelName = arg
+    elif opt in ("-r", "--recent"):
+      num_most_recent = int(arg)
 
   # Required Arguments
   if (channelName == "" or apikey == ""):
@@ -247,13 +258,17 @@ def main(argv):
     sys.exit(1)
 
   # get Video list
-  videos = GetVideosV3(apikey, channelName, VERBOSE_MODE)
+  videos = GetVideosV3(apikey, channelName, VERBOSE_MODE, num_most_recent)
 
   if not videos:
     return 1
 
   # Sort Videos
   videos = sorted(videos, key=lambda video:video['published'], reverse=True)
+
+  if (num_most_recent > 0):
+    if (len(videos) > num_most_recent): 
+      videos = videos[0:num_most_recent]
 
   if (VERBOSE_MODE): sys.stderr.write("Found " + str(len(videos)) + " Videos\n")
 
